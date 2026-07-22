@@ -1,0 +1,104 @@
+name: cloud_calls_mobile
+description: Awfar CC — Enterprise VoIP Softphone (SIP + WebRTC + FreePBX)
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+  flutter: ">=3.27.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+
+  # State Management
+  flutter_riverpod: ^2.6.1
+  riverpod_annotation: ^2.6.1
+
+  # SIP / WebRTC  (sip_ua 1.1.0 → uuid ^4, flutter_webrtc ^1.2.0, intl ^0.20.1)
+  sip_ua: ^1.1.0
+  flutter_webrtc: ^1.2.0
+
+  # Native Calls (CallKit on iOS, ConnectionService on Android)
+  flutter_callkit_incoming: ^2.5.2
+
+  # Firebase / Push
+  firebase_core: ^3.8.0
+  firebase_messaging: ^15.1.5
+  flutter_local_notifications: ^18.0.1
+
+  # Networking
+  dio: ^5.7.0
+  retrofit: ^4.4.1
+  pretty_dio_logger: ^1.4.0
+
+  # Storage
+  shared_preferences: ^2.3.3
+  flutter_secure_storage: ^9.2.2
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+
+  # Routing
+  go_router: ^14.6.1
+
+  # Utils
+  freezed_annotation: ^2.4.4
+  json_annotation: ^4.9.0
+  intl: ^0.20.1
+  uuid: ^4.5.1
+  permission_handler: ^11.3.1
+  connectivity_plus: ^6.1.0
+  device_info_plus: ^11.1.0
+  package_info_plus: ^8.1.1
+  url_launcher: ^6.3.1
+  audioplayers: ^6.1.0
+  vibration: ^2.0.1
+  flutter_contacts: ^1.1.9+2
+  wakelock_plus: ^1.2.8
+  flutter_background_service: ^5.0.10
+
+  # UI
+  google_fonts: ^6.2.1
+  lottie: ^3.1.3
+  shimmer: ^3.0.0
+  cached_network_image: ^3.4.1
+  flutter_svg: ^2.0.10+1
+
+  # Logging
+  logger: ^2.4.0
+  receive_sharing_intent: ^1.8.1
+  audio_session: ^0.2.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.1
+  # NOTE: code generation packages (build_runner, freezed, json_serializable,
+  # riverpod_generator, retrofit_generator, hive_generator) are intentionally
+  # omitted. This project does not rely on generated *.g.dart / *.freezed.dart
+  # files, and mixing riverpod_generator (analyzer ^7) with hive_generator
+  # (analyzer <7) causes an unsolvable version conflict on current Flutter SDKs.
+  # If you later want codegen, add them back individually and pin compatible
+  # analyzer versions.
+
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: true
+  image_path: "assets/icons/app_icon_source.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#0A0A1A"
+  adaptive_icon_foreground: "assets/icons/app_logo.png"
+  remove_alpha_ios: true
+  background_color_ios: "#0A0A1A"
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icons/
+    - assets/sounds/
