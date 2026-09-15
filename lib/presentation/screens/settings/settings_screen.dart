@@ -5,6 +5,7 @@ import '../../providers/theme_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/locale_provider.dart';
 import '../../providers/rbac_provider.dart';
+import '../../../core/constants/app_config.dart';
 import '../../../core/i18n/app_strings.dart';
 import '../../../core/services/storage_service.dart';
 
@@ -83,11 +84,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         const SizedBox(height: 12),
         Card(child: Column(children: [
           ListTile(leading: const Icon(Icons.task_alt), title: const Text('Tasks & follow-ups'), trailing: const Icon(Icons.chevron_right), onTap: () => context.push('/tasks')),
-          const Divider(height: 1),
-          ListTile(leading: const Icon(Icons.chat_bubble_outline), title: const Text('Team chat'), trailing: const Icon(Icons.chevron_right), onTap: () => context.push('/chat')),
-          if (rbac.canUseSupervisorTools) ...[
+          if (AppConfig.hasBackendConfigured) ...[
             const Divider(height: 1),
-            ListTile(leading: const Icon(Icons.supervisor_account), title: const Text('Supervisor board'), trailing: const Icon(Icons.chevron_right), onTap: () => context.push('/supervisor')),
+            ListTile(leading: const Icon(Icons.chat_bubble_outline), title: const Text('Team chat'), trailing: const Icon(Icons.chevron_right), onTap: () => context.push('/chat')),
+            if (rbac.canUseSupervisorTools) ...[
+              const Divider(height: 1),
+              ListTile(leading: const Icon(Icons.supervisor_account), title: const Text('Supervisor board'), trailing: const Icon(Icons.chevron_right), onTap: () => context.push('/supervisor')),
+            ],
           ],
         ])),
         const SizedBox(height: 12),

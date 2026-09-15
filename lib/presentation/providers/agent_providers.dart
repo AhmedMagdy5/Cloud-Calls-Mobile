@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_config.dart';
 import '../../data/call_history_store.dart';
 import '../../data/follow_up_state_store.dart';
-import '../../data/datasources/api_clients.dart';
 import '../../domain/entities/agent_assist_entity.dart';
 import '../../domain/entities/customer_entity.dart';
 import '../../domain/entities/queue_entity.dart';
@@ -14,7 +13,7 @@ import 'repository_providers.dart';
 
 final customerLookupProvider =
     FutureProvider.family<CustomerEntity?, String>((ref, phone) async {
-  if (phone.isEmpty) return null;
+  if (phone.isEmpty || !AppConfig.hasBackendConfigured) return null;
   return ref.read(customerRepositoryProvider).lookupByPhone(phone);
 });
 
@@ -88,6 +87,7 @@ final tasksAndFollowUpsProvider = FutureProvider<FollowUpTaskLists>((ref) async 
 });
 
 final queuesProvider = FutureProvider<List<QueueEntity>>((ref) async {
+  if (!AppConfig.hasBackendConfigured) return [];
   try {
     return await ref.read(queueRepositoryProvider).fetchQueues();
   } catch (_) {
@@ -96,6 +96,7 @@ final queuesProvider = FutureProvider<List<QueueEntity>>((ref) async {
 });
 
 final chatMessagesProvider = FutureProvider<List<ChatMessageEntity>>((ref) async {
+  if (!AppConfig.hasBackendConfigured) return [];
   try {
     return await ref.read(chatApiProvider).messages();
   } catch (_) {
@@ -105,18 +106,32 @@ final chatMessagesProvider = FutureProvider<List<ChatMessageEntity>>((ref) async
 
 final callAssistSummaryProvider =
     FutureProvider.family<AgentAssistSummary?, String>((ref, callId) async {
-  if (callId.isEmpty) return null;
+  if (callId.isEmpty || !AppConfig.hasBackendConfigured) return null;
   return ref.read(agentAssistApiProvider).summarizeCall(callId);
+});
+
+final callTranscriptProvider =
+    FutureProvider.family<List<TranscriptChunk>, String>((ref, callId) async {
+  if (callId.isEmpty || !AppConfig.hasBackendConfigured) return const [];
+  try {
+    return await ref
+        .read(agentAssistApiProvider)
+        .fetchTranscript(callId)
+        .timeout(const Duration(seconds: 6));
+  } catch (_) {
+    return const [];
+  }
 });
 
 final knowledgeSearchProvider =
     FutureProvider.family<List<String>, String>((ref, query) async {
-  if (query.trim().length < 2) return [];
+  if (query.trim().length < 2 || !AppConfig.hasBackendConfigured) return [];
   return ref.read(agentAssistApiProvider).searchKnowledge(query.trim());
 });
 
 final supervisorBoardProvider =
     FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  if (!AppConfig.hasBackendConfigured) return [];
   try {
     return await ref.read(supervisorApiProvider).agentBoard();
   } catch (_) {
@@ -125,6 +140,7 @@ final supervisorBoardProvider =
 });
 
 final voicemailProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  if (!AppConfig.hasBackendConfigured) return [];
   try {
     return await ref.read(voiceApiProvider).voicemail();
   } catch (_) {

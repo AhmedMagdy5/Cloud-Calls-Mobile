@@ -114,9 +114,20 @@ class AuthController extends StateNotifier<AuthState> {
       );
 
       await ref.read(sipServiceProvider).connect(result.sip);
+      final sip = ref.read(sipServiceProvider);
+      final registered = await sip.waitUntilRegistered();
+      if (!registered) {
+        state = AuthState(
+          loading: false,
+          error: sip.lastError ?? 'SIP registration failed',
+        );
+        return false;
+      }
       await PushService.instance.registerToken();
       await _startBackgroundSipSafely();
-      await OfflineSyncQueue.instance.flush();
+      if (AppConfig.hasBackendConfigured) {
+        await OfflineSyncQueue.instance.flush();
+      }
       ref.invalidate(savedSipProvider);
       return true;
     } catch (e) {
@@ -137,11 +148,12 @@ class AuthController extends StateNotifier<AuthState> {
       final repo = ref.read(sipRepoProvider);
       final existing = await repo.load();
       final base = existing ?? SipCredentials.empty;
-      final server =
-          (domain != null && domain.isNotEmpty) ? domain.trim() : base.server;
+      final server = (domain != null && domain.isNotEmpty)
+          ? domain.trim()
+          : (base.server.isNotEmpty ? base.server : AppConfig.sipServer);
       if (server.isEmpty) {
         throw StateError(
-          'FreePBX server IP or domain is required.',
+          'PBX server address is required.',
         );
       }
       final creds = base.copyWith(
@@ -161,6 +173,15 @@ class AuthController extends StateNotifier<AuthState> {
       state = AuthState(user: user, sip: creds);
 
       await ref.read(sipServiceProvider).connect(creds);
+      final sip = ref.read(sipServiceProvider);
+      final registered = await sip.waitUntilRegistered();
+      if (!registered) {
+        state = AuthState(
+          loading: false,
+          error: sip.lastError ?? 'SIP registration failed — check PBX / transport',
+        );
+        return false;
+      }
       await PushService.instance.registerToken();
       await _startBackgroundSipSafely();
       ref.invalidate(savedSipProvider);
@@ -169,6 +190,45 @@ class AuthController extends StateNotifier<AuthState> {
       state = AuthState(loading: false, error: loginErrorMessage(e));
       return false;
     }
+  }
+
+  /// Cold-start: reconnect with saved SIP credentials (Save login).
+  Future<bool> tryRestoreSession() async {
+    final repo = ref.read(sipRepoProvider);
+    final creds = await repo.load();
+    if (creds == null ||
+        creds.username.isEmpty ||
+        creds.server.isEmpty ||
+        creds.password.isEmpty) {
+      return false;
+    }
+
+    final user = UserEntity(
+      id: creds.username,
+      name: creds.displayName ?? creds.username,
+      email: '',
+      extension: creds.username,
+    );
+    if (AppConfig.hasBackendConfigured) {
+      final profile = UserEntity.fromStoredString(
+        StorageService.getString(StorageKeys.userProfile),
+      );
+      state = AuthState(
+        user: profile ?? user,
+        sip: creds,
+        useBackendAuth: profile != null,
+      );
+    } else {
+      state = AuthState(user: user, sip: creds);
+    }
+
+    final sip = ref.read(sipServiceProvider);
+    await sip.connect(creds);
+    // Don't block forever — retries continue in background if needed.
+    await sip.waitUntilRegistered(timeout: const Duration(seconds: 8));
+    await PushService.instance.registerToken();
+    await _startBackgroundSipSafely();
+    return true;
   }
 
   Future<void> applySipSettings(SipCredentials creds, {bool reconnect = true}) async {
@@ -183,11 +243,20 @@ class AuthController extends StateNotifier<AuthState> {
 
   Future<void> logout() async {
     try {
-      await ref.read(authRepositoryProvider).logout();
+      await ref
+          .read(authRepositoryProvider)
+          .logout()
+          .timeout(const Duration(seconds: 3));
     } catch (_) {}
-    await MobilePresenceService.instance.stop(logout: true);
-    await ref.read(sipServiceProvider).disconnect();
-    await ref.read(sipRepoProvider).clear();
+    try {
+      await MobilePresenceService.instance.stop(logout: true);
+    } catch (_) {}
+    try {
+      await ref.read(sipServiceProvider).disconnect();
+    } catch (_) {}
+    try {
+      await ref.read(sipRepoProvider).clear();
+    } catch (_) {}
     if (AppConfig.enableBackgroundSip) {
       try {
         await SipBackgroundService.instance.stop();

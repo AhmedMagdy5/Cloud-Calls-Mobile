@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/auth_provider.dart';
+import '../../../core/constants/app_config.dart';
 import '../../../core/services/backend_settings_service.dart';
 import '../../../domain/entities/user_entity.dart';
 import '../../../features/presence/mobile_presence_service.dart';
@@ -59,7 +60,7 @@ class _SipSettingsScreenState extends ConsumerState<SipSettingsScreen> {
       _registrationSecret.text = BackendSettingsService.instance.registrationSecret;
       _username.text = c.username;
       _password.text = c.password;
-      _server.text = c.server;
+      _server.text = c.server.isNotEmpty ? c.server : AppConfig.sipServer;
       _port.text = c.port.toString();
       _transport = c.transport;
       _authId.text = c.authId ?? '';
@@ -227,13 +228,13 @@ class _SipSettingsScreenState extends ConsumerState<SipSettingsScreen> {
                   _apiUrl,
                   'Backend / Webphone API URL',
                   icon: Icons.hub_outlined,
-                  hint: 'https://phone-test.awfarcc.com/api-files',
+                  hint: 'https://yourcompany.com/api-files',
                 ),
                 _field(
                   _registrationSecret,
                   'Registration Secret',
                   icon: Icons.key_outlined,
-                  hint: 'AWF-SIP-REG-2026-X9K4M7',
+                  hint: 'Provided by your administrator',
                 ),
                 Text(
                   'Supervisor presence: saves Online / DND / In Call to webphone reports. API URL must end with /api-files.',

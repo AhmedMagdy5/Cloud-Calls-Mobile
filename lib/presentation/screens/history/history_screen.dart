@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../data/call_history_store.dart';
 import '../../../domain/entities/call_entity.dart';
 import '../../providers/call_provider.dart';
+import '../../../core/constants/app_config.dart';
 import '../../providers/repository_providers.dart';
 
 enum _Filter { all, incoming, outgoing, missed }
@@ -25,7 +26,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     super.initState();
     _store.load();
     _store.addListener(_onChange);
-    Future.microtask(() => ref.read(callRepositoryProvider).fetchRemoteHistory());
+    Future.microtask(() {
+      if (AppConfig.hasBackendConfigured) {
+        ref.read(callRepositoryProvider).fetchRemoteHistory();
+      }
+    });
   }
 
   @override

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/constants/app_config.dart';
 import '../../providers/agent_providers.dart';
 import '../../providers/repository_providers.dart';
 
@@ -24,9 +25,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Future<void> _send() async {
     final text = _input.text.trim();
     if (text.isEmpty || _sending) return;
+    if (!AppConfig.hasBackendConfigured) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Team chat needs a backend API URL in SIP settings.'),
+          ),
+        );
+      }
+      return;
+    }
     setState(() => _sending = true);
     try {
-      await ref.read(chatApiProvider).send(text: text);
+      await ref
+          .read(chatApiProvider)
+          .send(text: text)
+          .timeout(const Duration(seconds: 8));
       _input.clear();
       ref.invalidate(chatMessagesProvider);
     } catch (e) {

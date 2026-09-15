@@ -8,6 +8,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
+import 'core/constants/app_config.dart';
 import 'core/theme/app_theme.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/storage_service.dart';
@@ -43,6 +44,7 @@ Future<void> main() async {
 
   // Storage
   await StorageService.init();
+  await OfflineSyncQueue.instance.purgeIfNoBackend();
   SipService.instance.loadPresence();
 
   // Local call notifications must work even when Firebase isn't configured.
@@ -59,7 +61,6 @@ Future<void> main() async {
   try {
     await Firebase.initializeApp();
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-    await NotificationService.instance.init();
     await PushService.instance.init();
   } catch (e) {
     debugPrint('Firebase init skipped: $e');
@@ -157,7 +158,9 @@ class _CloudCallsAppState extends ConsumerState<CloudCallsApp>
           s != SipStatus.reconnecting) {
         SipService.instance.ensureConnected();
       }
-      OfflineSyncQueue.instance.flush();
+      if (AppConfig.hasBackendConfigured) {
+        OfflineSyncQueue.instance.flush();
+      }
       FollowUpNotificationService.instance.checkDue();
       unawaited(MobilePresenceService.instance.ensureRunning());
       WidgetsBinding.instance.addPostFrameCallback((_) => _onSipChange(force: true));
@@ -224,7 +227,6 @@ class _CloudCallsAppState extends ConsumerState<CloudCallsApp>
     final locale = ref.watch(localeProvider);
     final router = ref.watch(appRouterProvider);
     _router = router;
-    WidgetsBinding.instance.addPostFrameCallback((_) => _onSipChange());
 
     return MaterialApp.router(
       title: 'Awfar CC',

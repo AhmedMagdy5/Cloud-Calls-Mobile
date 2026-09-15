@@ -20,7 +20,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _OnbData(Icons.shield_outlined, 'Secure & encrypted',
         'TLS + SRTP keep every conversation private'),
     _OnbData(Icons.cloud_done_outlined, 'Connect to your PBX',
-        'Works with FreePBX, Asterisk and any SIP server'),
+        'Works with Asterisk, 3CX, and any SIP PBX'),
   ];
 
   Future<void> _finish() async {

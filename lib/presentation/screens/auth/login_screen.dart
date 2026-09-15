@@ -21,7 +21,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _domain = TextEditingController();
   bool _obscure = true;
   bool _prefilled = false;
-  bool _rememberLogin = false;
+  bool _rememberLogin = true;
   bool _useBackendAuth = false;
 
   bool get _backendAvailable => BackendSettingsService.instance.isConfigured;
@@ -37,9 +37,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         _rememberLogin = remember;
         if (saved != null) {
           _user.text = saved.username;
-          _domain.text = saved.server;
+          _domain.text = saved.server.isNotEmpty
+              ? saved.server
+              : AppConfig.sipServer;
           if (saved.password.isNotEmpty) _pass.text = saved.password;
           _prefilled = true;
+        } else {
+          _domain.text = AppConfig.sipServer;
         }
       });
     });
@@ -165,7 +169,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const SizedBox(height: 6),
                     Text(
                       sipMode
-                          ? 'Connect to FreePBX with extension and server IP'
+                          ? 'Connect to your PBX with extension and server address'
                           : 'Sign in with your agent account (API)',
                       style: GoogleFonts.dmSans(
                         color: AppTheme.textMuted,
@@ -178,7 +182,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         segments: const [
                           ButtonSegment(
                             value: false,
-                            label: Text('FreePBX / SIP'),
+                            label: Text('PBX / SIP'),
                             icon: Icon(Icons.dialpad),
                           ),
                           ButtonSegment(
@@ -246,8 +250,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             TextFormField(
                               controller: _domain,
                               decoration: const InputDecoration(
-                                labelText: 'FreePBX Server (IP or domain)',
-                                hintText: '192.168.1.10',
+                                labelText: 'PBX Server (IP or domain)',
+                                hintText: AppConfig.sipServer,
                                 prefixIcon: Icon(Icons.dns_outlined),
                               ),
                               validator: (v) =>

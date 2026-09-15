@@ -144,7 +144,8 @@ class AppTheme {
       listTileTheme: ListTileThemeData(
         iconColor: mutedText,
         textColor: scheme.onSurface,
-        tileColor: cardColor,
+        // Avoid global tileColor — conflicts with Card/Material and causes
+        // ink decoration assertions (ListTile + parent Material).
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: cardColor,

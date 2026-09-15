@@ -43,6 +43,10 @@ class SipService extends ChangeNotifier implements SipUaHelperListener {
   Timer? _retryTimer;
   int _retryAttempt = 0;
   bool _uaRestarting = false;
+  /// When WS drops mid-call, defer full UA restart until the call ends
+  /// (restarting via `_ua.stop()` kills the live session immediately).
+  bool _reconnectAfterCall = false;
+  Future<void>? _startUaInFlight;
   PresenceMode _presence = PresenceMode.online;
   static const _kPresenceKey = 'sip_presence_mode';
   static const _kBreakReasonKey = 'sip_break_reason';
@@ -144,8 +148,11 @@ class SipService extends ChangeNotifier implements SipUaHelperListener {
     } else {
       // online or dnd → make sure we are connected
       if (_creds != null && !isRegistered) {
-        _retryAttempt = 0;
-        await _startUa();
+        if (_status != SipStatus.registering &&
+            _status != SipStatus.reconnecting) {
+          _retryAttempt = 0;
+          await _startUa();
+        }
       } else {
         notifyListeners();
       }
@@ -199,8 +206,32 @@ class SipService extends ChangeNotifier implements SipUaHelperListener {
   }
 
   Future<void> _startUa({bool skipStop = false}) async {
+    // Serialize UA starts — overlapping stop/start causes reconnect churn.
+    while (_startUaInFlight != null) {
+      await _startUaInFlight;
+      if (isRegistered && !skipStop) return;
+      if (_creds == null) return;
+    }
+    final gate = Completer<void>();
+    _startUaInFlight = gate.future;
+    try {
+      await _startUaBody(skipStop: skipStop);
+    } finally {
+      if (!gate.isCompleted) gate.complete();
+      if (identical(_startUaInFlight, gate.future)) {
+        _startUaInFlight = null;
+      }
+    }
+  }
+
+  Future<void> _startUaBody({bool skipStop = false}) async {
     final creds = _creds;
     if (creds == null) return;
+    if (_hasLiveCall && !skipStop) {
+      debugPrint('[SIP] skip _startUa — live call in progress');
+      _reconnectAfterCall = true;
+      return;
+    }
     _setStatus(SipStatus.registering);
 
     // Build the WS URL. sip_ua supports WebSocket transports only.
@@ -237,6 +268,12 @@ class SipService extends ChangeNotifier implements SipUaHelperListener {
         ..iceServers = _buildIceServers(creds)
         ..register = true
         ..register_expires = 600
+        // FreePBX/Asterisk WebRTC: session timers often drop calls early when
+        // UPDATE/re-INVITE refresh fails. Disable — previous stable builds
+        // behaved better without RFC 4028 on this stack.
+        ..sessionTimers = false
+        ..connectionRecoveryMaxInterval = 30
+        ..connectionRecoveryMinInterval = 2
 
         ..webSocketUrl = wsUrl
         ..webSocketSettings.allowBadCertificate = true
@@ -253,6 +290,18 @@ class SipService extends ChangeNotifier implements SipUaHelperListener {
     }
   }
 
+  /// Wait until SIP is registered, or [timeout] elapses.
+  Future<bool> waitUntilRegistered({Duration? timeout}) async {
+    final limit = timeout ?? AppConfig.registerTimeout;
+    if (isRegistered) return true;
+    final deadline = DateTime.now().add(limit);
+    while (DateTime.now().isBefore(deadline)) {
+      if (isRegistered) return true;
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    }
+    return isRegistered;
+  }
+
   List<Map<String, String>> _buildIceServers(SipCredentials c) {
     if (!c.iceEnabled) return const [];
     final list = <Map<String, String>>[];
@@ -266,7 +315,12 @@ class SipService extends ChangeNotifier implements SipUaHelperListener {
     return list;
   }
 
-  Future<void> register() async => _startUa();
+  Future<void> register() async {
+    if (_status == SipStatus.registering || _status == SipStatus.reconnecting) {
+      return;
+    }
+    await _startUa();
+  }
   Future<void> reRegister() async { debugPrint('[SIP] re-register'); _ua.register(); }
   Future<void> unregister() async {
     _retryTimer?.cancel();
@@ -274,20 +328,36 @@ class SipService extends ChangeNotifier implements SipUaHelperListener {
     _setStatus(SipStatus.unregistered);
   }
   Future<void> disconnect() async {
-    await MobilePresenceService.instance.stop(logout: false);
+    try {
+      await MobilePresenceService.instance.stop(logout: false);
+    } catch (_) {}
     _retryTimer?.cancel();
-    _ua.stop();
-    _ua.removeSipUaHelperListener(this);
+    try {
+      _ua.stop();
+    } catch (_) {}
+    try {
+      _ua.removeSipUaHelperListener(this);
+    } catch (_) {}
     _creds = null;
     _calls.clear();
     _activeCall = null;
     _setStatus(SipStatus.idle);
   }
 
+  bool get _hasLiveCall =>
+      _calls.isNotEmpty ||
+      (_activeCall != null && !_activeCall!.status.isTerminal);
+
   void _scheduleRetry() {
     if (_retryTimer?.isActive ?? false) return; // already pending
     if (_creds == null) return;
     if (_presence == PresenceMode.offline) return; // user is offline by choice
+    // Never stop/restart the UA while a call is up — that tears down media.
+    if (_hasLiveCall) {
+      debugPrint('[SIP] defer reconnect until call ends');
+      _reconnectAfterCall = true;
+      return;
+    }
     _retryAttempt++;
     // Exponential backoff capped at 30s: 5, 10, 15, 20, 30…
     final secs = [5, 10, 15, 20, 30];
@@ -297,10 +367,22 @@ class SipService extends ChangeNotifier implements SipUaHelperListener {
     _retryTimer = Timer(delay, () => _startUa());
   }
 
+  void _maybeReconnectAfterCall() {
+    if (!_reconnectAfterCall) return;
+    if (_hasLiveCall) return;
+    _reconnectAfterCall = false;
+    if (_creds == null || _presence == PresenceMode.offline) return;
+    debugPrint('[SIP] call ended — reconnecting transport');
+    _retryAttempt = 0;
+    _scheduleRetry();
+  }
+
   /// Public hook — call when connectivity returns or app resumes.
   Future<void> ensureConnected() async {
     if (_creds == null) return;
     if (_presence == PresenceMode.offline) return;
+    // Don't tear down a live call with a full UA restart.
+    if (_hasLiveCall) return;
     // Don't interrupt healthy / in-progress states — this caused needless
     // reconnect loops every time the UI rebuilt or the app resumed.
     if (_status == SipStatus.registered ||
@@ -454,14 +536,17 @@ class SipService extends ChangeNotifier implements SipUaHelperListener {
     }
     await _ensureMicPermission();
     if (!isRegistered) {
-      debugPrint('[SIP] makeCall: not registered → forcing re-register');
-      await _startUa();
-      // Wait briefly for registration.
-      final deadline = DateTime.now().add(const Duration(seconds: 6));
-      while (!isRegistered && DateTime.now().isBefore(deadline)) {
-        await Future.delayed(const Duration(milliseconds: 200));
+      if (_status != SipStatus.registering &&
+          _status != SipStatus.reconnecting) {
+        debugPrint('[SIP] makeCall: not registered → forcing re-register');
+        await _startUa();
       }
-      if (!isRegistered) throw StateError('SIP not registered — check server / transport');
+      final ok = await waitUntilRegistered(timeout: AppConfig.registerTimeout);
+      if (!ok) {
+        throw StateError(
+          _lastError ?? 'SIP not registered — check server / transport',
+        );
+      }
     }
     debugPrint('[SIP] makeCall → $number');
     if (!hasHeldCalls) {
@@ -1018,6 +1103,7 @@ class SipService extends ChangeNotifier implements SipUaHelperListener {
       if (_calls.isEmpty) {
         _cleanupMedia();
         unawaited(CallKitService.instance.endAll());
+        _maybeReconnectAfterCall();
       } else {
         unawaited(CallKitService.instance.endCall(callId));
       }
@@ -1056,12 +1142,35 @@ class SipService extends ChangeNotifier implements SipUaHelperListener {
         _status == SipStatus.registered &&
         !_uaRestarting) {
       _lastError = 'Transport disconnected';
+      if (_hasLiveCall) {
+        // Full UA restart would hang up the live call. Keep media; reconnect later.
+        debugPrint('[SIP] transport lost mid-call — defer UA restart');
+        _reconnectAfterCall = true;
+        return;
+      }
       _scheduleRetry();
     }
   }
   @override void onNewMessage(SIPMessageRequest msg) {}
   @override void onNewNotify(Notify ntf) {}
-  @override void onNewReinvite(ReInvite event) {}
+
+  /// Accept in-dialog re-INVITE with empty options only.
+  /// Do not refresh audio routes here — that was dropping calls early.
+  @override
+  void onNewReinvite(ReInvite event) {
+    debugPrint(
+      '[SIP] re-INVITE audio=${event.hasAudio} video=${event.hasVideo}',
+    );
+    final accept = event.accept;
+    if (accept == null) return;
+    unawaited(() async {
+      try {
+        await accept(<String, dynamic>{});
+      } catch (e, st) {
+        debugPrint('[SIP] re-INVITE accept failed: $e\n$st');
+      }
+    }());
+  }
 
   /// Map an Asterisk / Q.850 / SIP hangup cause to a UI [CallStatus],
   /// a human-readable reason, and the originating SIP status code (if any).
@@ -1148,9 +1257,23 @@ class SipService extends ChangeNotifier implements SipUaHelperListener {
     if (causeContains('REJECT') || causeContains('DECLINE')) {
       return (CallStatus.declined, 'Declined', code);
     }
+    if (causeContains('SESSION TIMER') ||
+        causeContains('SESSION_TIMER') ||
+        (phrase ?? '').toLowerCase().contains('session timer')) {
+      return (
+        answered ? CallStatus.ended : CallStatus.noAnswer,
+        'Session timer expired',
+        code ?? 408,
+      );
+    }
+
     if (causeContains('NO_ANSWER') || causeContains('NOANSWER') ||
         causeContains('EXPIRES') || causeContains('REQUEST_TIMEOUT')) {
-      return (CallStatus.noAnswer, 'No answer', code);
+      return (
+        answered ? CallStatus.ended : CallStatus.noAnswer,
+        answered ? (phrase ?? 'Call ended') : 'No answer',
+        code,
+      );
     }
     if (causeContains('CANCELED') || causeContains('CANCELLED')) {
       if (answered) return (CallStatus.ended, null, code);

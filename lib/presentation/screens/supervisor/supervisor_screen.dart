@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/constants/app_config.dart';
+import '../../../data/datasources/api_clients.dart';
 import '../../providers/agent_providers.dart';
 import '../../providers/rbac_provider.dart';
 import '../../providers/repository_providers.dart';
-import '../../../data/datasources/api_clients.dart';
 
 class SupervisorScreen extends ConsumerWidget {
   const SupervisorScreen({super.key});
@@ -49,11 +50,31 @@ class SupervisorScreen extends ConsumerWidget {
                 subtitle: Text(status),
                 trailing: PopupMenuButton<String>(
                   onSelected: (mode) async {
-                    await SupervisorApi().monitor(agentId: id, mode: mode);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('$mode started for $name')),
-                      );
+                    if (!AppConfig.hasBackendConfigured) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Supervisor tools need a backend API URL.'),
+                          ),
+                        );
+                      }
+                      return;
+                    }
+                    try {
+                      await SupervisorApi()
+                          .monitor(agentId: id, mode: mode)
+                          .timeout(const Duration(seconds: 8));
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('$mode started for $name')),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Failed: $e')),
+                        );
+                      }
                     }
                   },
                   itemBuilder: (_) => const [

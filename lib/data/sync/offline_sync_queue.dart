@@ -11,11 +11,19 @@ class OfflineSyncQueue {
 
   static const _key = 'offline_sync_queue';
 
+  Future<void> clear() async {
+    await StorageService.remove(_key);
+  }
+
+  Future<void> purgeIfNoBackend() async {
+    if (!AppConfig.hasBackendConfigured) await clear();
+  }
+
   Future<void> enqueue({
     required String type,
     required Map<String, dynamic> payload,
   }) async {
-    if (!AppConfig.enableOfflineSync) return;
+    if (!AppConfig.enableOfflineSync || !AppConfig.hasBackendConfigured) return;
     final list = await _load();
     list.add({
       'type': type,
@@ -26,7 +34,7 @@ class OfflineSyncQueue {
   }
 
   Future<void> flush() async {
-    if (!AppConfig.enableOfflineSync) return;
+    if (!AppConfig.enableOfflineSync || !AppConfig.hasBackendConfigured) return;
     final list = await _load();
     if (list.isEmpty) return;
 

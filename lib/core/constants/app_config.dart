@@ -1,6 +1,6 @@
 import '../services/backend_settings_service.dart';
 
-/// Application configuration & FreePBX/SIP defaults.
+/// Application configuration & PBX/SIP defaults.
 /// Mirror of the web project's `environment.ts`.
 class AppConfig {
   AppConfig._();
@@ -8,9 +8,9 @@ class AppConfig {
   static const String appName = 'Awfar CC';
   static const String appVersion = '1.0.0';
 
-  // ---- Backend (FreePBX REST / Asterisk ARI bridge) ----
+  // ---- Backend (PBX REST / Asterisk ARI bridge) ----
   /// Compile-time fallback when no URL is saved in app settings.
-  static const String defaultApiBaseUrl = 'https://your-freepbx-domain.com/api';
+  static const String defaultApiBaseUrl = 'https://your-pbx-domain.com/api';
   static String get apiBaseUrl => BackendSettingsService.instance.apiBaseUrl;
 
   static const String authPath = '/auth/login';
@@ -38,7 +38,8 @@ class AppConfig {
       BackendSettingsService.instance.integrationCommandsPath;
 
   // ---- SIP defaults (override per-user at login) ----
-  static const String sipServer = 'sip.your-freepbx-domain.com';
+  /// Default SIP / PBX domain for this build.
+  static const String sipServer = 'server-orient-pbx.ddns.net';
   static const int sipPort = 5060;
   static const String sipTransport = 'udp';
   static const String sipPath = '/ws';
@@ -62,7 +63,7 @@ class AppConfig {
   static const bool enableOfflineSync = true;
   static const int followUpReminderMinutes = 5;
 
-  /// FreePBX default parking feature code (blind transfer target).
+  /// PBX default parking feature code (blind transfer target).
   static const String defaultParkingExtension = '*70';
 
   /// Keep false until foreground service is fully configured on device.

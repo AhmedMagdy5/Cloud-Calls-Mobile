@@ -1,17 +1,19 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../providers/auth_provider.dart';
 
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
+class _SplashScreenState extends ConsumerState<SplashScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
 
@@ -22,11 +24,26 @@ class _SplashScreenState extends State<SplashScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1800),
     )..repeat(reverse: true);
-    Timer(const Duration(milliseconds: 1500), () {
+    unawaited(_boot());
+  }
+
+  Future<void> _boot() async {
+    final onboarded = StorageService.getBool(StorageKeys.onboardingDone);
+    if (!onboarded) {
+      await Future<void>.delayed(const Duration(milliseconds: 900));
       if (!mounted) return;
-      final onboarded = StorageService.getBool(StorageKeys.onboardingDone);
-      context.go(onboarded ? '/login' : '/onboarding');
-    });
+      context.go('/onboarding');
+      return;
+    }
+
+    // Parallel: minimum splash feel + restore saved SIP session.
+    final restored = await Future.wait([
+      Future<void>.delayed(const Duration(milliseconds: 700)),
+      ref.read(authProvider.notifier).tryRestoreSession(),
+    ]).then((r) => r[1] as bool);
+
+    if (!mounted) return;
+    context.go(restored ? '/home' : '/login');
   }
 
   @override

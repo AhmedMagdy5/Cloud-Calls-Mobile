@@ -6,9 +6,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/constants/app_config.dart';
 import '../../core/services/notification_service.dart';
-import '../../core/services/storage_service.dart';
 import '../../data/datasources/api_clients.dart';
-import '../callkit/callkit_service.dart';
 import '../integration/webphone_integration_service.dart';
 import '../sip/sip_service.dart';
 
@@ -35,7 +33,7 @@ class PushService {
 
   /// Register device token with backend after login.
   Future<void> registerToken() async {
-    if (Firebase.apps.isEmpty) return;
+    if (Firebase.apps.isEmpty || !AppConfig.hasBackendConfigured) return;
     final token = NotificationService.instance.token ??
         await FirebaseMessaging.instance.getToken();
     if (token == null || token.isEmpty) return;
@@ -72,14 +70,9 @@ class PushService {
     final name = data['name']?.toString() ?? number;
     if (number.isEmpty) return;
 
+    // Wake SIP so a real INVITE can land. Do not fabricate CallKit UI —
+    // answering a fake call with no SIP session hangs the softphone.
     await SipService.instance.ensureConnected();
-
-    final callId = data['callId']?.toString() ?? CallKitService.newCallId();
-    await CallKitService.instance.showIncoming(
-      callId: callId,
-      name: name,
-      number: number,
-    );
     await NotificationService.instance.showIncomingCall(name: name, number: number);
   }
 }

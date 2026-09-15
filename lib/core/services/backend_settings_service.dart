@@ -7,7 +7,12 @@ class BackendSettingsService {
   BackendSettingsService._();
   static final instance = BackendSettingsService._();
 
-  static const _placeholderHosts = {'your-freepbx-domain.com', 'your-freepbx-domain'};
+  static const _placeholderHosts = {
+    'your-pbx-domain.com',
+    'your-pbx-domain',
+    'your-freepbx-domain.com',
+    'your-freepbx-domain',
+  };
 
   String get apiBaseUrl {
     final stored = StorageService.getString(StorageKeys.apiBaseUrl);

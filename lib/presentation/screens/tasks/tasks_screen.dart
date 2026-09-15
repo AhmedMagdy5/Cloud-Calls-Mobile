@@ -171,8 +171,13 @@ class _TasksScreenState extends ConsumerState<TasksScreen>
         }
       }
     }
-    if (!closedLocally && !t.isLocal) {
-      await ref.read(taskRepositoryProvider).complete(t.id);
+    if (!closedLocally && !t.isLocal && AppConfig.hasBackendConfigured) {
+      try {
+        await ref
+            .read(taskRepositoryProvider)
+            .complete(t.id)
+            .timeout(const Duration(seconds: 8));
+      } catch (_) {}
     }
     ref.invalidate(pendingTasksProvider);
     ref.invalidate(tasksAndFollowUpsProvider);

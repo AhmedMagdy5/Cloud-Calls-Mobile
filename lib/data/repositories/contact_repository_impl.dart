@@ -1,3 +1,4 @@
+import '../../core/constants/app_config.dart';
 import '../../data/contacts_store.dart';
 import '../../data/datasources/api_clients.dart';
 import '../../data/sync/offline_sync_queue.dart';
@@ -10,6 +11,10 @@ class ContactRepositoryImpl implements ContactRepository {
 
   @override
   Future<List<ContactEntity>> fetchRemote() async {
+    if (!AppConfig.hasBackendConfigured) {
+      await ContactsStore.instance.load();
+      return ContactsStore.instance.items;
+    }
     try {
       final items = await _api.contacts();
       for (final j in items) {
@@ -28,6 +33,7 @@ class ContactRepositoryImpl implements ContactRepository {
 
   @override
   Future<void> pushContact(ContactEntity contact) async {
+    if (!AppConfig.hasBackendConfigured) return;
     try {
       await _api.upsertContact({
         'id': contact.id,

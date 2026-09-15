@@ -10,7 +10,7 @@ class SipSettingsRepository {
   static const _kTurnPwd = 'sip_turn_password';
   static const _kSaveLogin = 'sip_save_login';
 
-  bool get shouldSaveLogin => StorageService.getBool(_kSaveLogin);
+  bool get shouldSaveLogin => StorageService.getBool(_kSaveLogin, def: true);
 
   Future<void> save(SipCredentials c, {bool remember = true}) async {
     await StorageService.setBool(_kSaveLogin, remember);

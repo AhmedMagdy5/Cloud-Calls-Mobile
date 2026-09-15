@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 import '../constants/app_config.dart';
 import '../services/storage_service.dart';
@@ -29,7 +30,11 @@ class DioClient {
       },
       onError: (e, h) => h.next(e),
     ));
-    dio.interceptors.add(PrettyDioLogger(requestBody: true, responseBody: true, error: true));
+    if (kDebugMode && AppConfig.hasBackendConfigured) {
+      dio.interceptors.add(
+        PrettyDioLogger(requestBody: true, responseBody: true, error: true),
+      );
+    }
     return dio;
   }
 }

@@ -1,3 +1,4 @@
+import '../../core/constants/app_config.dart';
 import '../../data/call_history_store.dart';
 import '../../data/datasources/api_clients.dart';
 import '../../data/sync/offline_sync_queue.dart';
@@ -10,6 +11,10 @@ class CallRepositoryImpl implements CallRepository {
 
   @override
   Future<List<CallEntity>> fetchRemoteHistory({int limit = 50}) async {
+    if (!AppConfig.hasBackendConfigured) {
+      await CallHistoryStore.instance.load();
+      return CallHistoryStore.instance.items;
+    }
     try {
       final items = await _api.history(limit: limit);
       final remote = items.map(_mapRemoteCall).toList();
@@ -29,6 +34,7 @@ class CallRepositoryImpl implements CallRepository {
     String? note,
     DateTime? followUpAt,
   }) async {
+    if (!AppConfig.hasBackendConfigured) return;
     try {
       await _api.wrapUp(
         callId: callId,

@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_config.dart';
 import '../../domain/entities/agent_assist_entity.dart';
 import '../providers/agent_providers.dart';
-import '../providers/repository_providers.dart';
 
 /// Real-time agent assist panel (transcript + knowledge search).
 class AgentAssistPanel extends ConsumerStatefulWidget {
@@ -34,13 +33,11 @@ class _AgentAssistPanelState extends ConsumerState<AgentAssistPanel> {
 
   @override
   Widget build(BuildContext context) {
-    if (!AppConfig.enableAgentAssist) return const SizedBox.shrink();
+    if (!AppConfig.enableAgentAssist || !AppConfig.hasBackendConfigured) {
+      return const SizedBox.shrink();
+    }
 
-    final transcript = ref.watch(
-      FutureProvider((ref) async {
-        return ref.read(agentAssistApiProvider).fetchTranscript(widget.callId);
-      }),
-    );
+    final transcript = ref.watch(callTranscriptProvider(widget.callId));
     final knowledge = ref.watch(knowledgeSearchProvider(_query));
 
     return Container(
@@ -150,7 +147,9 @@ class AgentAssistSummaryBanner extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (!AppConfig.enableAgentAssist) return const SizedBox.shrink();
+    if (!AppConfig.enableAgentAssist || !AppConfig.hasBackendConfigured) {
+      return const SizedBox.shrink();
+    }
     final summary = ref.watch(callAssistSummaryProvider(callId));
     return summary.when(
       data: (s) {

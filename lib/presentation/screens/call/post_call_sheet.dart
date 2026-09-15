@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/constants/app_config.dart';
 import '../../../core/services/follow_up_notification_service.dart';
 import '../../../data/call_history_store.dart';
 import '../../../data/repositories/task_repository_impl.dart';
@@ -90,14 +91,16 @@ class _PostCallSheetState extends ConsumerState<PostCallSheet> {
         widget.call.id,
         _followUp!,
       );
-      try {
-        await TaskRepositoryImpl().createTask(
-          title: 'Follow-up: ${widget.call.displayName ?? widget.call.number}',
-          number: widget.call.number,
-          dueAt: _followUp,
-          callId: widget.call.id,
-        );
-      } catch (_) {}
+      if (AppConfig.hasBackendConfigured) {
+        try {
+          await TaskRepositoryImpl().createTask(
+            title: 'Follow-up: ${widget.call.displayName ?? widget.call.number}',
+            number: widget.call.number,
+            dueAt: _followUp,
+            callId: widget.call.id,
+          );
+        } catch (_) {}
+      }
     } else if (widget.call.followUpAt != null) {
       await CallHistoryStore.instance.updateMeta(
         widget.call.id,
