@@ -1,0 +1,30 @@
+# Awfar CC — Store listing (Google Play)
+
+## Short description
+Awfar CC — SIP softphone for business VoIP calls over your PBX.
+
+## Full description
+Awfar CC is a business VoIP softphone for agents and teams.
+
+Connect to your company PBX using SIP credentials and make or receive calls over the internet.
+
+Key features:
+• SIP login with extension and password
+• Outgoing and incoming VoIP calls
+• Call history and local contacts
+• Presence modes (Online / Do Not Disturb / Offline)
+• Tasks and follow-up reminders
+• Optional headset / Bluetooth audio support
+
+Who it’s for:
+Call center agents and employees who need a mobile softphone connected to their company’s PBX (for example FreePBX / Asterisk-based systems).
+
+Permissions:
+The app may request microphone access for calls, contacts for caller ID, phone state for call handling, notifications for incoming calls, and Bluetooth for headsets.
+
+Note:
+A valid PBX/SIP account from your organization is required. This app does not provide a phone number by itself.
+
+## Privacy policy URL
+After GitHub Pages is enabled:
+https://ahmedmagdy5.github.io/Cloud-Calls-Mobile/privacy.html
